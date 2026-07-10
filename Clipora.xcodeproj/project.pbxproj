@@ -1,0 +1,389 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 56;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		CAFEBABE0000000000000101 /* main.swift in Sources */ = {isa = PBXBuildFile; fileRef = CAFEBABE0000000000000001 /* main.swift */; };
+		CAFEBABE0000000000000102 /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = CAFEBABE0000000000000002 /* AppDelegate.swift */; };
+		CAFEBABE0000000000000103 /* ClipItem.swift in Sources */ = {isa = PBXBuildFile; fileRef = CAFEBABE0000000000000003 /* ClipItem.swift */; };
+		CAFEBABE0000000000000104 /* DatabaseManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = CAFEBABE0000000000000004 /* DatabaseManager.swift */; };
+		CAFEBABE0000000000000105 /* ContentClassifier.swift in Sources */ = {isa = PBXBuildFile; fileRef = CAFEBABE0000000000000005 /* ContentClassifier.swift */; };
+		CAFEBABE0000000000000106 /* ImageStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = CAFEBABE0000000000000006 /* ImageStore.swift */; };
+		CAFEBABE0000000000000107 /* AppSettings.swift in Sources */ = {isa = PBXBuildFile; fileRef = CAFEBABE0000000000000007 /* AppSettings.swift */; };
+		CAFEBABE0000000000000108 /* PasteboardMonitor.swift in Sources */ = {isa = PBXBuildFile; fileRef = CAFEBABE0000000000000008 /* PasteboardMonitor.swift */; };
+		CAFEBABE0000000000000109 /* HotkeyManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = CAFEBABE0000000000000009 /* HotkeyManager.swift */; };
+		CAFEBABE000000000000010A /* Formatters.swift in Sources */ = {isa = PBXBuildFile; fileRef = CAFEBABE000000000000000A /* Formatters.swift */; };
+		CAFEBABE000000000000010B /* ClipPanel.swift in Sources */ = {isa = PBXBuildFile; fileRef = CAFEBABE000000000000000B /* ClipPanel.swift */; };
+		CAFEBABE000000000000010C /* PanelController.swift in Sources */ = {isa = PBXBuildFile; fileRef = CAFEBABE000000000000000C /* PanelController.swift */; };
+		CAFEBABE000000000000010D /* ClipRowView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CAFEBABE000000000000000D /* ClipRowView.swift */; };
+		CAFEBABE000000000000010E /* SettingsWindowController.swift in Sources */ = {isa = PBXBuildFile; fileRef = CAFEBABE000000000000000E /* SettingsWindowController.swift */; };
+		CAFEBABE000000000000010F /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CAFEBABE000000000000000F /* SettingsView.swift */; };
+		CAFEBABE0000000000000110 /* GRDB in Frameworks */ = {isa = PBXBuildFile; productRef = CAFEBABE0000000000000603 /* GRDB */; };
+		CAFEBABE0000000000000111 /* KeyboardShortcuts in Frameworks */ = {isa = PBXBuildFile; productRef = CAFEBABE0000000000000604 /* KeyboardShortcuts */; };
+		CAFEBABE0000000000000112 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = CAFEBABE0000000000000011 /* Assets.xcassets */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXFileReference section */
+		CAFEBABE0000000000000001 /* main.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = main.swift; sourceTree = "<group>"; };
+		CAFEBABE0000000000000002 /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDelegate.swift; sourceTree = "<group>"; };
+		CAFEBABE0000000000000003 /* ClipItem.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClipItem.swift; sourceTree = "<group>"; };
+		CAFEBABE0000000000000004 /* DatabaseManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DatabaseManager.swift; sourceTree = "<group>"; };
+		CAFEBABE0000000000000005 /* ContentClassifier.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentClassifier.swift; sourceTree = "<group>"; };
+		CAFEBABE0000000000000006 /* ImageStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ImageStore.swift; sourceTree = "<group>"; };
+		CAFEBABE0000000000000007 /* AppSettings.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppSettings.swift; sourceTree = "<group>"; };
+		CAFEBABE0000000000000008 /* PasteboardMonitor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PasteboardMonitor.swift; sourceTree = "<group>"; };
+		CAFEBABE0000000000000009 /* HotkeyManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HotkeyManager.swift; sourceTree = "<group>"; };
+		CAFEBABE000000000000000A /* Formatters.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Formatters.swift; sourceTree = "<group>"; };
+		CAFEBABE000000000000000B /* ClipPanel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClipPanel.swift; sourceTree = "<group>"; };
+		CAFEBABE000000000000000C /* PanelController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PanelController.swift; sourceTree = "<group>"; };
+		CAFEBABE000000000000000D /* ClipRowView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClipRowView.swift; sourceTree = "<group>"; };
+		CAFEBABE000000000000000E /* SettingsWindowController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsWindowController.swift; sourceTree = "<group>"; };
+		CAFEBABE000000000000000F /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
+		CAFEBABE0000000000000010 /* Clipora.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Clipora.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		CAFEBABE0000000000000011 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+/* End PBXFileReference section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		CAFEBABE0000000000000302 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				CAFEBABE0000000000000110 /* GRDB in Frameworks */,
+				CAFEBABE0000000000000111 /* KeyboardShortcuts in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		CAFEBABE0000000000000201 = {
+			isa = PBXGroup;
+			children = (
+				CAFEBABE0000000000000202 /* Clipora */,
+				CAFEBABE0000000000000207 /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+		CAFEBABE0000000000000202 /* Clipora */ = {
+			isa = PBXGroup;
+			children = (
+				CAFEBABE0000000000000203 /* App */,
+				CAFEBABE0000000000000204 /* Core */,
+				CAFEBABE0000000000000205 /* Panel */,
+				CAFEBABE0000000000000206 /* SettingsUI */,
+				CAFEBABE0000000000000011 /* Assets.xcassets */,
+			);
+			path = Clipora;
+			sourceTree = "<group>";
+		};
+		CAFEBABE0000000000000203 /* App */ = {
+			isa = PBXGroup;
+			children = (
+				CAFEBABE0000000000000001 /* main.swift */,
+				CAFEBABE0000000000000002 /* AppDelegate.swift */,
+			);
+			path = App;
+			sourceTree = "<group>";
+		};
+		CAFEBABE0000000000000204 /* Core */ = {
+			isa = PBXGroup;
+			children = (
+				CAFEBABE0000000000000003 /* ClipItem.swift */,
+				CAFEBABE0000000000000004 /* DatabaseManager.swift */,
+				CAFEBABE0000000000000005 /* ContentClassifier.swift */,
+				CAFEBABE0000000000000006 /* ImageStore.swift */,
+				CAFEBABE0000000000000007 /* AppSettings.swift */,
+				CAFEBABE0000000000000008 /* PasteboardMonitor.swift */,
+				CAFEBABE0000000000000009 /* HotkeyManager.swift */,
+				CAFEBABE000000000000000A /* Formatters.swift */,
+			);
+			path = Core;
+			sourceTree = "<group>";
+		};
+		CAFEBABE0000000000000205 /* Panel */ = {
+			isa = PBXGroup;
+			children = (
+				CAFEBABE000000000000000B /* ClipPanel.swift */,
+				CAFEBABE000000000000000C /* PanelController.swift */,
+				CAFEBABE000000000000000D /* ClipRowView.swift */,
+			);
+			path = Panel;
+			sourceTree = "<group>";
+		};
+		CAFEBABE0000000000000206 /* SettingsUI */ = {
+			isa = PBXGroup;
+			children = (
+				CAFEBABE000000000000000E /* SettingsWindowController.swift */,
+				CAFEBABE000000000000000F /* SettingsView.swift */,
+			);
+			path = SettingsUI;
+			sourceTree = "<group>";
+		};
+		CAFEBABE0000000000000207 /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				CAFEBABE0000000000000010 /* Clipora.app */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		CAFEBABE0000000000000401 /* Clipora */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = CAFEBABE0000000000000502 /* Build configuration list for PBXNativeTarget "Clipora" */;
+			buildPhases = (
+				CAFEBABE0000000000000301 /* Sources */,
+				CAFEBABE0000000000000302 /* Frameworks */,
+				CAFEBABE0000000000000303 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = Clipora;
+			packageProductDependencies = (
+				CAFEBABE0000000000000603 /* GRDB */,
+				CAFEBABE0000000000000604 /* KeyboardShortcuts */,
+			);
+			productName = Clipora;
+			productReference = CAFEBABE0000000000000010 /* Clipora.app */;
+			productType = "com.apple.product-type.application";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		CAFEBABE0000000000000402 /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = 1;
+				LastUpgradeCheck = 2600;
+			};
+			buildConfigurationList = CAFEBABE0000000000000501 /* Build configuration list for PBXProject "Clipora" */;
+			compatibilityVersion = "Xcode 14.0";
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				en,
+				Base,
+			);
+			mainGroup = CAFEBABE0000000000000201;
+			packageReferences = (
+				CAFEBABE0000000000000601 /* XCRemoteSwiftPackageReference "GRDB.swift" */,
+				CAFEBABE0000000000000602 /* XCRemoteSwiftPackageReference "KeyboardShortcuts" */,
+			);
+			productRefGroup = CAFEBABE0000000000000207 /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				CAFEBABE0000000000000401 /* Clipora */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		CAFEBABE0000000000000303 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				CAFEBABE0000000000000112 /* Assets.xcassets in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		CAFEBABE0000000000000301 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				CAFEBABE0000000000000101 /* main.swift in Sources */,
+				CAFEBABE0000000000000102 /* AppDelegate.swift in Sources */,
+				CAFEBABE0000000000000103 /* ClipItem.swift in Sources */,
+				CAFEBABE0000000000000104 /* DatabaseManager.swift in Sources */,
+				CAFEBABE0000000000000105 /* ContentClassifier.swift in Sources */,
+				CAFEBABE0000000000000106 /* ImageStore.swift in Sources */,
+				CAFEBABE0000000000000107 /* AppSettings.swift in Sources */,
+				CAFEBABE0000000000000108 /* PasteboardMonitor.swift in Sources */,
+				CAFEBABE0000000000000109 /* HotkeyManager.swift in Sources */,
+				CAFEBABE000000000000010A /* Formatters.swift in Sources */,
+				CAFEBABE000000000000010B /* ClipPanel.swift in Sources */,
+				CAFEBABE000000000000010C /* PanelController.swift in Sources */,
+				CAFEBABE000000000000010D /* ClipRowView.swift in Sources */,
+				CAFEBABE000000000000010E /* SettingsWindowController.swift in Sources */,
+				CAFEBABE000000000000010F /* SettingsView.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin XCBuildConfiguration section */
+		CAFEBABE0000000000000503 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu17;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"DEBUG=1",
+					"$(inherited)",
+				);
+				MACOSX_DEPLOYMENT_TARGET = 14.0;
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				MTL_FAST_MATH = YES;
+				ONLY_ACTIVE_ARCH = YES;
+				SDKROOT = macosx;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "DEBUG $(inherited)";
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+				SWIFT_VERSION = 5.0;
+			};
+			name = Debug;
+		};
+		CAFEBABE0000000000000504 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				COPY_PHASE_STRIP = NO;
+				DEAD_CODE_STRIPPING = YES;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				DEPLOYMENT_POSTPROCESSING = YES;
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu17;
+				GCC_NO_COMMON_BLOCKS = YES;
+				MACOSX_DEPLOYMENT_TARGET = 14.0;
+				MTL_ENABLE_DEBUG_INFO = NO;
+				MTL_FAST_MATH = YES;
+				SDKROOT = macosx;
+				STRIP_INSTALLED_PRODUCT = YES;
+				STRIP_STYLE = "non-global";
+				SWIFT_COMPILATION_MODE = wholemodule;
+				SWIFT_OPTIMIZATION_LEVEL = "-O";
+				SWIFT_VERSION = 5.0;
+			};
+			name = Release;
+		};
+		CAFEBABE0000000000000505 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_IDENTITY = "-";
+				CODE_SIGN_STYLE = Manual;
+				COMBINE_HIDPI_IMAGES = YES;
+				CURRENT_PROJECT_VERSION = 1;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_CFBundleDisplayName = Clipora;
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.utilities";
+				INFOPLIST_KEY_LSUIElement = YES;
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				INFOPLIST_KEY_NSPrincipalClass = NSApplication;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+				);
+				MACOSX_DEPLOYMENT_TARGET = 14.0;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.clipora.app;
+				PRODUCT_NAME = Clipora;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+			};
+			name = Debug;
+		};
+		CAFEBABE0000000000000506 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_IDENTITY = "-";
+				CODE_SIGN_STYLE = Manual;
+				COMBINE_HIDPI_IMAGES = YES;
+				CURRENT_PROJECT_VERSION = 1;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_CFBundleDisplayName = Clipora;
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.utilities";
+				INFOPLIST_KEY_LSUIElement = YES;
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				INFOPLIST_KEY_NSPrincipalClass = NSApplication;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+				);
+				MACOSX_DEPLOYMENT_TARGET = 14.0;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.clipora.app;
+				PRODUCT_NAME = Clipora;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+			};
+			name = Release;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		CAFEBABE0000000000000501 /* Build configuration list for PBXProject "Clipora" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				CAFEBABE0000000000000503 /* Debug */,
+				CAFEBABE0000000000000504 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		CAFEBABE0000000000000502 /* Build configuration list for PBXNativeTarget "Clipora" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				CAFEBABE0000000000000505 /* Debug */,
+				CAFEBABE0000000000000506 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+/* End XCConfigurationList section */
+
+/* Begin XCRemoteSwiftPackageReference section */
+		CAFEBABE0000000000000601 /* XCRemoteSwiftPackageReference "GRDB.swift" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/groue/GRDB.swift.git";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 7.0.0;
+			};
+		};
+		CAFEBABE0000000000000602 /* XCRemoteSwiftPackageReference "KeyboardShortcuts" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/sindresorhus/KeyboardShortcuts";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 2.0.0;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		CAFEBABE0000000000000603 /* GRDB */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = CAFEBABE0000000000000601 /* XCRemoteSwiftPackageReference "GRDB.swift" */;
+			productName = GRDB;
+		};
+		CAFEBABE0000000000000604 /* KeyboardShortcuts */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = CAFEBABE0000000000000602 /* XCRemoteSwiftPackageReference "KeyboardShortcuts" */;
+			productName = KeyboardShortcuts;
+		};
+/* End XCSwiftPackageProductDependency section */
+	};
+	rootObject = CAFEBABE0000000000000402 /* Project object */;
+}
