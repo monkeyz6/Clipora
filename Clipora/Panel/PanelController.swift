@@ -34,6 +34,9 @@ final class PanelController: NSObject {
     private var currentTab: Tab = .history
     private var keyMonitor: Any?
     private var isClosing = false
+    private var reloadWorkItem: DispatchWorkItem?
+    private var reloadGeneration = 0
+    private var isLoadingList = false
 
     // 收藏页列表顶部随分组栏显隐切换的两条约束
     private var scrollTopHistory: NSLayoutConstraint!
@@ -59,6 +62,7 @@ final class PanelController: NSObject {
         cache.totalCostLimit = 8 * 1024 * 1024
         return cache
     }()
+    private var thumbnailRequests = Set<Int64>()
 
     /// 删除后希望落到的行；由 clipStoreDidChange 驱动的 reload 消费
     private var pendingSelectionRow: Int?
@@ -464,6 +468,10 @@ final class PanelController: NSObject {
         panel.orderOut(nil)
         panel.alphaValue = 1
         isClosing = false
+        reloadWorkItem?.cancel()
+        reloadWorkItem = nil
+        reloadGeneration += 1
+        isLoadingList = false
         items = []
         pendingSelectionRow = nil
         suppressNextStoreChange = false
@@ -474,6 +482,7 @@ final class PanelController: NSObject {
         groupChipsBar.resetInteractionState()
         tableView.reloadData()
         thumbnailCache.removeAllObjects()
+        thumbnailRequests.removeAll()
     }
 
     /// 以中心为锚的等效缩放（layer anchor 在左下角，用平移补偿）
@@ -511,31 +520,75 @@ final class PanelController: NSObject {
         reload()
     }
 
-    private func reload() {
+    /// 列表加载永不在主线程执行。输入事件会合并为一次 150ms 后的查询，其余刷新立即进入后台。
+    private func reload(debounced: Bool = false) {
         pendingReload = false
+        reloadWorkItem?.cancel()
+        reloadGeneration += 1
+        let generation = reloadGeneration
         let query = searchField.stringValue
         let previousSelection = selectedItem()?.id
         let pending = pendingSelectionRow
         pendingSelectionRow = nil
+        let tab = currentTab
+        let groupId = activeGroupId
 
-        switch currentTab {
-        case .history:
-            items = DatabaseManager.shared.history(matching: query)
-        case .favorites:
-            // 分组栏随收藏刷新；校正失效的 activeGroupId（分组被删）
-            groups = DatabaseManager.shared.groups()
-            if let gid = activeGroupId, !groups.contains(where: { $0.id == gid }) {
+        isLoadingList = true
+        updateEmptyState(query: query)
+
+        let work = DispatchWorkItem { [weak self] in
+            guard let self else { return }
+            switch tab {
+            case .history:
+                DatabaseManager.shared.loadHistory(matching: query) { [weak self] items in
+                    self?.applyLoadedItems(
+                        items, groups: nil, generation: generation, tab: tab, query: query,
+                        groupId: groupId, previousSelection: previousSelection, pendingSelection: pending
+                    )
+                }
+            case .favorites:
+                DatabaseManager.shared.loadFavorites(matching: query, groupId: groupId) { [weak self] items, groups in
+                    self?.applyLoadedItems(
+                        items, groups: groups, generation: generation, tab: tab, query: query,
+                        groupId: groupId, previousSelection: previousSelection, pendingSelection: pending
+                    )
+                }
+            }
+        }
+        reloadWorkItem = work
+        if debounced {
+            DispatchQueue.main.asyncAfter(deadline: .now() + .milliseconds(150), execute: work)
+        } else {
+            work.perform()
+        }
+    }
+
+    private func applyLoadedItems(
+        _ loadedItems: [ClipItem], groups loadedGroups: [ClipGroup]?, generation: Int, tab: Tab,
+        query: String, groupId: Int64?, previousSelection: Int64?, pendingSelection: Int?
+    ) {
+        guard panel.isVisible, generation == reloadGeneration, currentTab == tab,
+              searchField.stringValue == query, activeGroupId == groupId else { return }
+
+        if let loadedGroups {
+            groups = loadedGroups
+            // 分组刚被删除时，重新加载“全部”而不是短暂显示一个失效分组的空结果。
+            if let groupId, !groups.contains(where: { $0.id == groupId }) {
                 activeGroupId = nil
+                reload()
+                return
             }
             groupChipsBar.configure(groups: groups, activeGroupId: activeGroupId)
-            items = DatabaseManager.shared.favorites(matching: query, groupId: activeGroupId)
         }
+
+        items = loadedItems
+        isLoadingList = false
         tableView.reloadData()
         updateEmptyState(query: query)
 
         // 删除后落到原位置的相邻行；否则尽量保持原选中项；再否则选第一行（保证纯键盘流可用）
-        if let pending, !items.isEmpty {
-            let next = min(max(pending, 0), items.count - 1)
+        if let pendingSelection, !items.isEmpty {
+            let next = min(max(pendingSelection, 0), items.count - 1)
             tableView.selectRowIndexes([next], byExtendingSelection: false)
             tableView.scrollRowToVisible(next)
         } else if let previousSelection,
@@ -548,6 +601,10 @@ final class PanelController: NSObject {
     }
 
     private func updateEmptyState(query: String) {
+        guard !isLoadingList else {
+            emptyStack.isHidden = true
+            return
+        }
         emptyStack.isHidden = !items.isEmpty
         guard items.isEmpty else { return }
         if currentTab == .favorites {
@@ -815,7 +872,7 @@ final class PanelController: NSObject {
 
 extension PanelController: NSTextFieldDelegate {
     func controlTextDidChange(_ obj: Notification) {
-        reload()
+        reload(debounced: true)
     }
 }
 
@@ -866,8 +923,8 @@ extension PanelController: NSTableViewDataSource, NSTableViewDelegate {
             with: item, showsDragHandle: onFav,
             showsGroupButton: onFav && !groups.isEmpty, showsStar: !onFav
         )
-        if item.type == .image, let id = item.id, let image = thumbnailImage(for: id) {
-            cell.showThumbnail(image)
+        if item.type == .image, let id = item.id {
+            loadThumbnailIfNeeded(id: id, for: cell)
         }
         // 动作按钮只跟表格的选中行绑定（而非鼠标是否停留在这一行的原始状态）。
         // 否则用键盘上下选择时列表滚动、光标却停在原地不动，会被判定为“鼠标进入了另一行”，
@@ -904,14 +961,30 @@ extension PanelController: NSTableViewDataSource, NSTableViewDelegate {
         return cell
     }
 
-    /// 可见行按需取缩略图 BLOB 并缓存
-    private func thumbnailImage(for id: Int64) -> NSImage? {
+    /// 可见行按需异步取缩略图 BLOB 并缓存，避免搜索刷新期间主线程读库。
+    private func loadThumbnailIfNeeded(id: Int64, for cell: ClipRowCellView) {
         let key = NSNumber(value: id)
-        if let cached = thumbnailCache.object(forKey: key) { return cached }
-        guard let data = DatabaseManager.shared.thumbnail(id: id),
-              let image = NSImage(data: data) else { return nil }
-        thumbnailCache.setObject(image, forKey: key, cost: data.count)
-        return image
+        if let cached = thumbnailCache.object(forKey: key) {
+            cell.showThumbnail(cached)
+            return
+        }
+        guard !thumbnailRequests.contains(id) else { return }
+        thumbnailRequests.insert(id)
+        DatabaseManager.shared.loadThumbnail(id: id) { [weak self] data in
+            guard let self else { return }
+            thumbnailRequests.remove(id)
+            guard let data, let image = NSImage(data: data) else { return }
+            thumbnailCache.setObject(image, forKey: key, cost: data.count)
+
+            let visible = tableView.rows(in: tableView.visibleRect)
+            guard visible.length > 0 else { return }
+            for row in visible.lowerBound..<visible.upperBound where row < items.count {
+                guard items[row].id == id,
+                      let cell = tableView.view(atColumn: 0, row: row, makeIfNecessary: false)
+                        as? ClipRowCellView else { continue }
+                cell.showThumbnail(image)
+            }
+        }
     }
 
     // MARK: 收藏列表拖拽排序

@@ -24,12 +24,15 @@ final class DatabaseManager {
 
     /// 列表查询投影：排除 thumbnail BLOB（按行懒加载），文本 content 截断为预览，
     /// 避免 500 条历史把全部缩略图/长文本一次性载入内存。
-    private static let listColumns =
-        "id, type, subtype, " +
-        "CASE WHEN type = 'text' THEN substr(content, 1, 512) ELSE content END AS content, " +
-        "image_path, content_hash, is_favorite, fav_sort_order, created_at, source_app, alias, group_id"
+    private static func listColumns(table: String = "items") -> String {
+        "\(table).id, \(table).type, \(table).subtype, " +
+        "CASE WHEN \(table).type = 'text' THEN substr(\(table).content, 1, 512) ELSE \(table).content END AS content, " +
+        "\(table).image_path, \(table).content_hash, \(table).is_favorite, \(table).fav_sort_order, " +
+        "\(table).created_at, \(table).source_app, \(table).alias, \(table).group_id"
+    }
 
     private let dbQueue: DatabaseQueue
+    private let readQueue = DispatchQueue(label: "com.clipora.database.read", qos: .userInitiated)
 
     private init() {
         let dir = AppPaths.appSupportDirectory
@@ -83,6 +86,43 @@ final class DatabaseManager {
             }
             // 已入分组的收藏项在分组被删时置空，加速按分组过滤
             try db.create(index: "idx_items_group_id", on: "items", columns: ["group_id"])
+        }
+        migrator.registerMigration("v4_search_fts") { db in
+            // 三元索引保留子串搜索体验，同时避开每次输入都扫描全部剪贴板正文。
+            // 外部内容表不复制正文；触发器让原有所有写路径自动保持索引一致。
+            try db.execute(sql: """
+                CREATE VIRTUAL TABLE items_fts USING fts5(
+                    content,
+                    alias,
+                    content='items',
+                    content_rowid='id',
+                    tokenize='trigram case_sensitive 0 remove_diacritics 0'
+                )
+                """)
+            try db.execute(sql: """
+                CREATE TRIGGER items_fts_ai AFTER INSERT ON items BEGIN
+                    INSERT INTO items_fts(rowid, content, alias)
+                    VALUES (new.id, new.content, new.alias);
+                END
+                """)
+            try db.execute(sql: """
+                CREATE TRIGGER items_fts_ad AFTER DELETE ON items BEGIN
+                    INSERT INTO items_fts(items_fts, rowid, content, alias)
+                    VALUES ('delete', old.id, old.content, old.alias);
+                END
+                """)
+            try db.execute(sql: """
+                CREATE TRIGGER items_fts_au AFTER UPDATE OF content, alias ON items BEGIN
+                    INSERT INTO items_fts(items_fts, rowid, content, alias)
+                    VALUES ('delete', old.id, old.content, old.alias);
+                    INSERT INTO items_fts(rowid, content, alias)
+                    VALUES (new.id, new.content, new.alias);
+                END
+                """)
+            try db.execute(sql: """
+                INSERT INTO items_fts(rowid, content, alias)
+                SELECT id, content, alias FROM items
+                """)
         }
         return migrator
     }
@@ -151,37 +191,114 @@ final class DatabaseManager {
 
     // MARK: - 查询
 
-    func history(matching query: String = "") -> [ClipItem] {
-        (try? dbQueue.read { db in
-            var sql = "SELECT \(Self.listColumns) FROM items"
-            var arguments: [DatabaseValueConvertible] = []
-            if !query.isEmpty {
-                // 别名也纳入搜索：原文或别名任一命中即匹配
-                sql += " WHERE (CLIPORA_CONTAINS_CI(content, ?) OR CLIPORA_CONTAINS_CI(alias, ?))"
-                arguments += [query, query]
+    /// 异步加载历史。数据库读取和记录解码都在后台串行队列，回调固定回到主线程。
+    func loadHistory(matching query: String = "", completion: @escaping ([ClipItem]) -> Void) {
+        readAsync("loadHistory", { db in
+            try Self.fetchHistory(in: db, matching: query)
+        }) { result in
+            switch result {
+            case .success(let items): completion(items)
+            case .failure: completion([])
             }
-            sql += " ORDER BY created_at DESC, id DESC LIMIT 2000"
-            return try ClipItem.fetchAll(db, sql: sql, arguments: StatementArguments(arguments))
-        }) ?? []
+        }
     }
 
-    /// 收藏列表。groupId 为 nil 时返回全部收藏；指定分组时仅返回该分组内的收藏。
-    func favorites(matching query: String = "", groupId: Int64? = nil) -> [ClipItem] {
-        (try? dbQueue.read { db in
-            var sql = "SELECT \(Self.listColumns) FROM items WHERE is_favorite = 1"
-            var arguments: [DatabaseValueConvertible] = []
-            if let groupId {
-                sql += " AND group_id = ?"
-                arguments.append(groupId)
+    /// 异步加载收藏和分组，保证面板不会为了更新胶囊栏在主线程读取数据库。
+    func loadFavorites(
+        matching query: String = "", groupId: Int64? = nil,
+        completion: @escaping ([ClipItem], [ClipGroup]) -> Void
+    ) {
+        readAsync("loadFavorites", { db in
+            let items = try Self.fetchFavorites(in: db, matching: query, groupId: groupId)
+            let groups = try ClipGroup
+                .order(ClipGroup.Columns.sortOrder.asc, ClipGroup.Columns.id.asc)
+                .fetchAll(db)
+            return (items, groups)
+        }) { result in
+            switch result {
+            case .success(let value): completion(value.0, value.1)
+            case .failure: completion([], [])
             }
-            if !query.isEmpty {
-                sql += " AND (CLIPORA_CONTAINS_CI(content, ?) OR CLIPORA_CONTAINS_CI(alias, ?))"
-                arguments += [query, query]
+        }
+    }
+
+    /// 缩略图也在后台读，避免列表 reload 时可见图片行阻塞输入事件。
+    func loadThumbnail(id: Int64, completion: @escaping (Data?) -> Void) {
+        readAsync("loadThumbnail", { db in
+            try Data.fetchOne(db, sql: "SELECT thumbnail FROM items WHERE id = ?", arguments: [id])
+        }) { result in
+            switch result {
+            case .success(let data): completion(data)
+            case .failure: completion(nil)
             }
-            // id ASC 作为平局兜底，防止历史脏数据里重复的 fav_sort_order 导致顺序不确定
-            sql += " ORDER BY fav_sort_order ASC, id ASC"
-            return try ClipItem.fetchAll(db, sql: sql, arguments: StatementArguments(arguments))
-        }) ?? []
+        }
+    }
+
+    private func readAsync<T>(
+        _ name: String, _ block: @escaping (Database) throws -> T,
+        completion: @escaping (Result<T, Error>) -> Void
+    ) {
+        readQueue.async { [self] in
+            do {
+                let result = try dbQueue.read(block)
+                DispatchQueue.main.async { completion(.success(result)) }
+            } catch {
+                NSLog("\(name) failed: \(error)")
+                DispatchQueue.main.async { completion(.failure(error)) }
+            }
+        }
+    }
+
+    private static func fetchHistory(in db: Database, matching query: String) throws -> [ClipItem] {
+        var sql = "SELECT \(listColumns()) FROM items"
+        var arguments: [DatabaseValueConvertible] = []
+        appendSearchFilter(to: &sql, arguments: &arguments, query: query, joinsFTS: false)
+        sql += " ORDER BY items.created_at DESC, items.id DESC LIMIT 2000"
+        return try ClipItem.fetchAll(db, sql: sql, arguments: StatementArguments(arguments))
+    }
+
+    private static func fetchFavorites(
+        in db: Database, matching query: String, groupId: Int64?
+    ) throws -> [ClipItem] {
+        let useFTS = usesFTS(for: query)
+        var sql = "SELECT \(listColumns()) FROM items"
+        if useFTS { sql += " JOIN items_fts ON items_fts.rowid = items.id" }
+        sql += " WHERE items.is_favorite = 1"
+        var arguments: [DatabaseValueConvertible] = []
+        if let groupId {
+            sql += " AND items.group_id = ?"
+            arguments.append(groupId)
+        }
+        appendSearchFilter(to: &sql, arguments: &arguments, query: query, joinsFTS: useFTS)
+        // id ASC 作为平局兜底，防止历史脏数据里重复的 fav_sort_order 导致顺序不确定
+        sql += " ORDER BY items.fav_sort_order ASC, items.id ASC"
+        return try ClipItem.fetchAll(db, sql: sql, arguments: StatementArguments(arguments))
+    }
+
+    private static func appendSearchFilter(
+        to sql: inout String, arguments: inout [DatabaseValueConvertible], query: String, joinsFTS: Bool
+    ) {
+        guard !query.isEmpty else { return }
+        if joinsFTS {
+            sql += " AND items_fts MATCH ?"
+            arguments.append(ftsPhrase(query))
+        } else if usesFTS(for: query) {
+            // History starts without a WHERE clause, so attach its FTS join and predicate together.
+            sql = sql.replacingOccurrences(of: " FROM items", with: " FROM items JOIN items_fts ON items_fts.rowid = items.id")
+            sql += " WHERE items_fts MATCH ?"
+            arguments.append(ftsPhrase(query))
+        } else {
+            // 1-2 字符的短词不被 trigram 覆盖，继续走原有 Foundation 子串语义。
+            sql += sql.contains(" WHERE ") ? " AND" : " WHERE"
+            sql += " (CLIPORA_CONTAINS_CI(items.content, ?) OR CLIPORA_CONTAINS_CI(items.alias, ?))"
+            arguments += [query, query]
+        }
+    }
+
+    private static func usesFTS(for query: String) -> Bool { query.count >= 3 }
+
+    private static func ftsPhrase(_ query: String) -> String {
+        "\"\(query.replacingOccurrences(of: "\"", with: "\"\""))\""
     }
 
     /// 列表行的 content 为截断预览；复制文本时按 id 取全文回写剪贴板
