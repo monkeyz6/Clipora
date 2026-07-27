@@ -34,6 +34,10 @@ enum ImageStore {
         try? FileManager.default.removeItem(at: originalURL(path: path))
     }
 
+    static func fileExists(path: String) -> Bool {
+        FileManager.default.fileExists(atPath: originalURL(path: path).path)
+    }
+
     /// 生成最长边 ≤ 200px 的 PNG 缩略图数据
     static func makeThumbnail(from data: Data) -> Data? {
         guard let image = NSImage(data: data) else { return nil }

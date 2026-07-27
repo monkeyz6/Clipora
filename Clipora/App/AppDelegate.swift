@@ -126,6 +126,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         RunLoop.main.add(timer, forMode: .common)
         cleanupTimer = timer
     }
+
+    /// 维护删除在后台队列执行；退出前先排空，保证「立即清除」等用户确认过的
+    /// 操作不会因进程退出被静默回滚，也不遗留已删行的孤儿图片文件。
+    func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
+        DatabaseManager.shared.drainMaintenance(timeout: 10) {
+            sender.reply(toApplicationShouldTerminate: true)
+        }
+        return .terminateLater
+    }
 }
 
 extension AppDelegate: NSMenuDelegate {

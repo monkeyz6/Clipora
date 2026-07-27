@@ -66,6 +66,8 @@ final class PanelController: NSObject {
 
     /// 删除后希望落到的行；由 clipStoreDidChange 驱动的 reload 消费
     private var pendingSelectionRow: Int?
+    /// 上次应用列表结果时的「标签|查询词」——查询一变就重选第一行而不是钉住旧选中项
+    private var lastSelectionKey: String?
     /// 拖拽排序已用 moveRow 同步 UI，跳过随后一次通知刷新以免打断动画
     private var suppressNextStoreChange = false
     /// 内联编辑期间收到的数据变更挂起，编辑结束后统一刷新，避免拆掉正在编辑的行
@@ -474,6 +476,7 @@ final class PanelController: NSObject {
         isLoadingList = false
         items = []
         pendingSelectionRow = nil
+        lastSelectionKey = nil
         suppressNextStoreChange = false
         aliasEditingItemId = nil
         groupEditing = false
@@ -520,7 +523,9 @@ final class PanelController: NSObject {
         reload()
     }
 
-    /// 列表加载永不在主线程执行。输入事件会合并为一次 150ms 后的查询，其余刷新立即进入后台。
+    /// 列表加载永不在主线程执行。输入事件按查询路径合并：快路径（FTS/原生 LIKE 路由，
+    /// 5 万条 ≤75ms，见 perfbench）用 50ms 合并连续击键/输入法组合；UDF 全表回退路径
+    /// （1-2 字符谚文/假名等，大库单次可达数百 ms）保持原 150ms 防止查询积压。
     private func reload(debounced: Bool = false) {
         pendingReload = false
         reloadWorkItem?.cancel()
@@ -557,7 +562,9 @@ final class PanelController: NSObject {
         }
         reloadWorkItem = work
         if debounced {
-            DispatchQueue.main.asyncAfter(deadline: .now() + .milliseconds(150), execute: work)
+            let delay: DispatchTimeInterval = DatabaseManager.shared
+                .isFastSearchQuery(query) ? .milliseconds(50) : .milliseconds(150)
+            DispatchQueue.main.asyncAfter(deadline: .now() + delay, execute: work)
         } else {
             work.perform()
         }
@@ -586,13 +593,22 @@ final class PanelController: NSObject {
         tableView.reloadData()
         updateEmptyState(query: query)
 
+        // 查询词一变（逐键输入），排序语义就换了一套（相关度重排），此时把高亮钉在
+        // 旧条目会导致「第一名不是回车目标」，必须回到第一行；查询未变的刷新
+        // （剪贴板新内容到达等）才按原选中项恢复，并补滚动到可见。
+        let selectionKey = "\(tab.rawValue)|\(query)"
+        let queryChanged = selectionKey != lastSelectionKey
+        lastSelectionKey = selectionKey
+
         // 删除后落到原位置的相邻行；否则尽量保持原选中项；再否则选第一行（保证纯键盘流可用）
         if let pendingSelection, !items.isEmpty {
             let next = min(max(pendingSelection, 0), items.count - 1)
             tableView.selectRowIndexes([next], byExtendingSelection: false)
             tableView.scrollRowToVisible(next)
-        } else if let previousSelection,
+        } else if !queryChanged, let previousSelection,
                   let row = items.firstIndex(where: { $0.id == previousSelection }) {
+            // 只恢复选中、不滚动：被动刷新（后台剪贴板变更）时用户可能正滚动浏览
+            // 远离选中行的区域，scrollRowToVisible 会无预警把视口拽回选中行
             tableView.selectRowIndexes([row], byExtendingSelection: false)
         } else if !items.isEmpty {
             tableView.selectRowIndexes([0], byExtendingSelection: false)
@@ -836,6 +852,8 @@ final class PanelController: NSObject {
     private func copySelectedAndClose() {
         guard let item = selectedItem(), !isClosing else { return }
         writeToPasteboard(item)
+        // 粘贴回写相关度信号（后台静默写，不阻塞关闭动画）
+        if let id = item.id { DatabaseManager.shared.recordPaste(id: id) }
 
         // 时序：面板快速缩放淡出关闭(~150ms) → 当前屏幕下方弹出「已复制」胶囊 Toast
         let screen = panel.screen ?? activeScreen()

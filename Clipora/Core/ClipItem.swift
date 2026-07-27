@@ -28,6 +28,10 @@ struct ClipItem: Identifiable, Equatable {
     var sourceApp: String? = nil   // 来源应用 bundle id（文本行显示其图标）
     var alias: String? = nil       // 用户自定义别名：只改展示、不改原始内容（复制仍用 content）
     var groupId: Int64? = nil      // 所属收藏分组（clip_groups.id），nil = 未分组；仅收藏页有意义
+    var likeSafe: Bool = false     // 行级 LIKE 安全标志（见 DatabaseManager.isLikeSafe），入库时计算
+    var pasteCount: Int = 0        // 从面板粘贴的次数（相关度信号，展示/调试用）
+    var lastUsedAt: Date? = nil    // 最近一次从面板粘贴的时间
+    var frecency: Double? = nil    // 对数域时间戳频次分（见 DatabaseManager.bumpedFrecency），搜索排序用
 
     /// 文件类型条目的路径列表（content 存 JSON 数组）
     var filePaths: [String] {
@@ -85,6 +89,10 @@ extension ClipItem: Codable, FetchableRecord, MutablePersistableRecord {
         case sourceApp = "source_app"
         case alias
         case groupId = "group_id"
+        case likeSafe = "like_safe"
+        case pasteCount = "paste_count"
+        case lastUsedAt = "last_used_at"
+        case frecency
     }
 
     enum Columns {
@@ -97,6 +105,7 @@ extension ClipItem: Codable, FetchableRecord, MutablePersistableRecord {
         static let createdAt = Column(CodingKeys.createdAt)
         static let alias = Column(CodingKeys.alias)
         static let groupId = Column(CodingKeys.groupId)
+        static let frecency = Column(CodingKeys.frecency)
     }
 
     mutating func didInsert(_ inserted: InsertionSuccess) {

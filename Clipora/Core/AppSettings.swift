@@ -73,6 +73,8 @@ enum AppSettings {
         static let maxContentSizeMB = "maxContentSizeMB"
         static let autoCleanupEnabled = "autoCleanupEnabled"
         static let retentionDays = "retentionDays"
+        static let historyLimit = "historyLimit"
+        static let searchByRelevance = "searchByRelevance"
         static let appearanceMode = "appearanceMode"
         static let glassStyle = "glassStyle"
         static let language = "appLanguage"
@@ -86,6 +88,8 @@ enum AppSettings {
             Key.maxContentSizeMB: 1.0,
             Key.autoCleanupEnabled: false,
             Key.retentionDays: 7,
+            Key.historyLimit: 500,
+            Key.searchByRelevance: true,
             Key.appearanceMode: AppearanceMode.system.rawValue,
             Key.glassStyle: GlassStyle.standard.rawValue,
             Key.language: Language.system.rawValue,
@@ -166,6 +170,19 @@ enum AppSettings {
     static var retentionDays: Int {
         get { max(1, defaults.integer(forKey: Key.retentionDays)) }
         set { defaults.set(max(1, newValue), forKey: Key.retentionDays) }
+    }
+
+    /// 非收藏历史条数上限（FIFO 淘汰）。默认 500 与历史版本一致；上界防误设导致库无界膨胀。
+    /// 搜索结果按相关度排序（匹配质量分层 + frecency）；关闭则回到纯时间序。
+    /// 只影响非空查询，空查询的历史列表始终是时间线。
+    static var searchByRelevance: Bool {
+        get { defaults.bool(forKey: Key.searchByRelevance) }
+        set { defaults.set(newValue, forKey: Key.searchByRelevance) }
+    }
+
+    static var historyLimit: Int {
+        get { min(50_000, max(100, defaults.integer(forKey: Key.historyLimit))) }
+        set { defaults.set(min(50_000, max(100, newValue)), forKey: Key.historyLimit) }
     }
 
     // MARK: - 开机自启（SMAppService）

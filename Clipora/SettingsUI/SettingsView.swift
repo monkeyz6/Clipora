@@ -125,6 +125,8 @@ private struct GeneralSettingsView: View {
     @AppStorage("maxContentSizeMB") private var maxContentSizeMB = 1.0
     @AppStorage("autoCleanupEnabled") private var autoCleanupEnabled = false
     @AppStorage("retentionDays") private var retentionDays = 7
+    @AppStorage("historyLimit") private var historyLimit = 500
+    @AppStorage("searchByRelevance") private var searchByRelevance = true
     @AppStorage("appearanceMode") private var appearanceModeRaw = AppSettings.AppearanceMode.system.rawValue
     @AppStorage("glassStyle") private var glassStyleRaw = AppSettings.GlassStyle.standard.rawValue
 
@@ -198,6 +200,20 @@ private struct GeneralSettingsView: View {
                         Button("English") { loc.set(.en) }
                     }
                 }
+                CardDivider(ds: ds)
+                row {
+                    Text(L("搜索结果排序", "Search result order")).settingLabel(ds)
+                    Spacer(minLength: 16)
+                    DropdownButton(
+                        ds: ds,
+                        label: searchByRelevance
+                            ? L("按相关度", "By relevance")
+                            : L("按时间", "By time")
+                    ) {
+                        Button(L("按相关度", "By relevance")) { searchByRelevance = true }
+                        Button(L("按时间", "By time")) { searchByRelevance = false }
+                    }
+                }
             }
         }
     }
@@ -263,6 +279,32 @@ private struct GeneralSettingsView: View {
                         onMinus: { retentionDays = max(1, retentionDays - 1) },
                         onPlus: { retentionDays = min(365, retentionDays + 1) }
                     )
+                }
+                CardDivider(ds: ds)
+                row {
+                    (Text(L("最多保留 ", "Keep at most ")).foregroundColor(ds.fg)
+                        + Text("\(historyLimit)").fontWeight(.semibold).foregroundColor(ds.fg)
+                        + Text(L(" 条历史", " items")).foregroundColor(ds.fg))
+                        .font(.system(size: 14.5))
+                    Spacer(minLength: 16)
+                    DropdownButton(ds: ds, label: "\(historyLimit)") {
+                        Button("500") { historyLimit = 500 }
+                        Button("1000") { historyLimit = 1000 }
+                        Button("5000") { historyLimit = 5000 }
+                        Button("10000") { historyLimit = 10000 }
+                        Button("50000") { historyLimit = 50000 }
+                    }
+                    .onChange(of: historyLimit) { oldValue, newValue in
+                        // 调低上限立即生效（后台裁剪），而不是等下一次复制才触发；
+                        // 调高无需裁剪，跳过空写事务与多余的变更广播
+                        if newValue < oldValue {
+                            DatabaseManager.shared.trimHistoryToLimit()
+                        }
+                    }
+                    .onAppear {
+                        // 外部改写（defaults write）越界值时，把显示对齐到实际生效的钳制值
+                        historyLimit = AppSettings.historyLimit
+                    }
                 }
             }
             Text(L("收藏的条目永不清理", "Favorites are never cleaned up"))

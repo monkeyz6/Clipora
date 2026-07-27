@@ -131,9 +131,10 @@ final class PasteboardMonitor {
 
         let hash = Self.sha256(data)
 
-        // 去重前置检查：同图已存在时不重复落盘（insertOrBump 兜底清理，双保险）
+        // 去重前置检查：同图已存在且原图文件完好时不重复落盘
+        // （文件缺失或竞态时照常落盘，insertOrBump 负责清理重复或收养自愈）
         var imagePath: String?
-        if !DatabaseManager.shared.exists(type: .image, contentHash: hash) {
+        if !DatabaseManager.shared.hasStoredImage(contentHash: hash) {
             imagePath = ImageStore.saveOriginal(pngData: data)
             guard imagePath != nil else { return nil }
         }
