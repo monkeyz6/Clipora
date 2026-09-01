@@ -82,8 +82,12 @@ final class PasteboardMonitor {
            ) as? [URL], !urls.isEmpty {
             snap.fileURLs = urls.map(\.path)
         }
-        if types.contains(.png) { snap.pngData = pasteboard.data(forType: .png) }
-        if types.contains(.tiff) { snap.tiffData = pasteboard.data(forType: .tiff) }
+        // 图片数据可达数十 MB，主线程只取必要的一份：有 PNG 就不再读 TIFF
+        // （TIFF 仅作无 PNG 时的转码回退）；忽略图片时两者都不读
+        if !AppSettings.ignoreImages {
+            if types.contains(.png) { snap.pngData = pasteboard.data(forType: .png) }
+            if snap.pngData == nil, types.contains(.tiff) { snap.tiffData = pasteboard.data(forType: .tiff) }
+        }
         snap.string = pasteboard.string(forType: .string)
 
         let hasContent = snap.fileURLs != nil || snap.pngData != nil
