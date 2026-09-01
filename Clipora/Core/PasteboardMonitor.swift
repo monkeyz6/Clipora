@@ -61,8 +61,16 @@ final class PasteboardMonitor {
         var sourceApp: String?
     }
 
+    /// nspasteboard.org 约定的元类型：密码管理器等标记的敏感内容（Concealed）、
+    /// 声明不应进入剪贴板历史的临时内容（Transient）。入库会把密码明文留在本地库里。
+    private static let excludedTypes: [NSPasteboard.PasteboardType] = [
+        .init("org.nspasteboard.ConcealedType"),
+        .init("org.nspasteboard.TransientType"),
+    ]
+
     private func readSnapshot() -> Snapshot? {
         let types = pasteboard.types ?? []
+        guard !types.contains(where: Self.excludedTypes.contains) else { return nil }
         var snap = Snapshot()
         // 复制发生时的前台应用即来源 App（自身为 LSUIElement 不抢前台）
         snap.sourceApp = NSWorkspace.shared.frontmostApplication?.bundleIdentifier
