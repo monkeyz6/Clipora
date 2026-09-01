@@ -689,6 +689,11 @@ final class PanelController: NSObject {
     private func handleKeyDown(_ event: NSEvent) -> Bool {
         // 内联编辑别名/分组名时，按键交给输入框（Enter/Esc 由其自行处理）
         if isInlineEditing { return false }
+        // 输入法组合中（拼音/假名等未上屏）：Return=上屏、↑↓=选候选、Esc=取消组合，
+        // 都属于输入法，必须原样放行；否则中文输入按回车会误触发「复制选中项并关闭」
+        if let editor = panel.firstResponder as? NSTextView, editor.hasMarkedText() {
+            return false
+        }
         let flags = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
 
         switch event.keyCode {
