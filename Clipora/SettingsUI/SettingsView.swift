@@ -164,15 +164,9 @@ private struct GeneralSettingsView: View {
                     Text(L("外观", "Appearance")).settingLabel(ds)
                     Spacer(minLength: 16)
                     DropdownButton(ds: ds, label: appearanceLabel) {
-                        button(L("跟随系统", "System"), .system, $appearanceModeRaw) { apply in
-                            appearanceModeRaw = apply; AppSettings.applyAppearance()
-                        }
-                        button(L("浅色", "Light"), .light, $appearanceModeRaw) { apply in
-                            appearanceModeRaw = apply; AppSettings.applyAppearance()
-                        }
-                        button(L("深色", "Dark"), .dark, $appearanceModeRaw) { apply in
-                            appearanceModeRaw = apply; AppSettings.applyAppearance()
-                        }
+                        appearanceButton(L("跟随系统", "System"), .system)
+                        appearanceButton(L("浅色", "Light"), .light)
+                        appearanceButton(L("深色", "Dark"), .dark)
                     }
                 }
                 CardDivider(ds: ds)
@@ -356,12 +350,9 @@ private struct GeneralSettingsView: View {
         Toggle("", isOn: isOn).labelsHidden().toggleStyle(AppleToggleStyle(ds: ds))
     }
 
-    /// 外观下拉的单个选项（选中后回调应用）
-    private func button(
-        _ title: String, _ mode: AppSettings.AppearanceMode,
-        _ raw: Binding<String>, _ apply: @escaping (String) -> Void
-    ) -> some View {
-        Button(title) { apply(mode.rawValue) }
+    /// 外观下拉的单个选项（选中后写库并应用）
+    private func appearanceButton(_ title: String, _ mode: AppSettings.AppearanceMode) -> some View {
+        Button(title) { appearanceModeRaw = mode.rawValue; AppSettings.applyAppearance() }
     }
 
     private func glassButton(_ title: String, _ style: AppSettings.GlassStyle) -> some View {
