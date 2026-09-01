@@ -326,9 +326,11 @@ final class BenchDB {
 
     // —— 与 DatabaseManager.bumpedFrecency 逐字一致 ——
     static let frecencyLambda = log(2.0) / (7 * 86400.0)
+    static let frecencyMaxHorizon: TimeInterval = 365 * 86400
 
     static func bumpedFrecency(old: Double?, weight: Double, now: TimeInterval) -> Double {
-        let decayed = old.map { exp(frecencyLambda * ($0 - now)) } ?? 0
+        let clamped = old.map { $0.isFinite ? min($0, now + frecencyMaxHorizon) : now }
+        let decayed = clamped.map { exp(frecencyLambda * ($0 - now)) } ?? 0
         return now + log(decayed + weight) / frecencyLambda
     }
 
