@@ -741,6 +741,11 @@ final class GroupChipsBar: NSView, NSTextFieldDelegate {
         editingGroupId = nil
         onEditingStateChanged?(false)
         invalidateIntrinsicContentSize()
+        // 与 startEditingUI 同理：胶囊栏高度不变时 Auto Layout 不会重跑 layout()，
+        // 需显式驱动 performLayout 收起输入框、恢复 ＋ 按钮与被隐藏的胶囊。
+        // 否则空名提交（数据层忽略、无变更通知触发重建）后输入框会残留在栏上。
+        needsLayout = true
+        layoutSubtreeIfNeeded()
         window?.layoutIfNeeded()
     }
 

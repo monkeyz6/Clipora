@@ -689,6 +689,11 @@ final class PanelController: NSObject {
     private func handleKeyDown(_ event: NSEvent) -> Bool {
         // 内联编辑别名/分组名时，按键交给输入框（Enter/Esc 由其自行处理）
         if isInlineEditing { return false }
+        // 输入法组合中（拼音/假名等未上屏）：Return=上屏、↑↓=选候选、Esc=取消组合，
+        // 都属于输入法，必须原样放行；否则中文输入按回车会误触发「复制选中项并关闭」
+        if let editor = panel.firstResponder as? NSTextView, editor.hasMarkedText() {
+            return false
+        }
         let flags = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
 
         switch event.keyCode {
@@ -1044,10 +1049,12 @@ extension PanelController: NSTableViewDataSource, NSTableViewDelegate {
         row: Int,
         dropOperation: NSTableView.DropOperation
     ) -> Bool {
+        // 按条目 id 反查当前行：拖拽期间后台剪贴板变更可能已触发 reload，
+        // 落下时 pasteboard 里的行号是拖起时的快照，直接用会移错条目
         guard canReorderFavorites,
-              let str = info.draggingPasteboard.string(forType: Self.favDragType),
-              let sourceRow = Int(str),
-              sourceRow >= 0, sourceRow < items.count else { return false }
+              let str = info.draggingPasteboard.string(forType: GroupChipsBar.itemDropType),
+              let draggedId = Int64(str),
+              let sourceRow = items.firstIndex(where: { $0.id == draggedId }) else { return false }
 
         var targetRow = row
         if sourceRow < targetRow { targetRow -= 1 }
