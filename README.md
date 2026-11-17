@@ -40,9 +40,9 @@ Pure custom-drawn AppKit rendering, disappears instantly after selection. No Doc
 | `Tab` | Switch between History and Favorites |
 | `↑` / `↓` | Navigate selection |
 | `Enter` / Click | Copy item and hide panel |
-| `Esc` | Hide panel |
+| `Esc` | Clear search; press again to hide panel |
 | `⌘ D` | Star / Unstar selected item |
-| `⌘ ⌫` | Delete current item (unstars if in Favorites tab) |
+| `⌘ ⌫` | Delete current item (unstars if in Favorites tab); with a search query it edits the query instead |
 
 *Note: Summon hotkeys can be customized via **App Settings → Shortcuts** (right-click the menu bar icon).*
 

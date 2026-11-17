@@ -15,7 +15,9 @@ final class PanelController: NSObject {
     private let panel: ClipPanel
     private let headerDrag = HeaderDragView()
     private let toast = ToastPresenter()
-    private let searchField = NSTextField()
+    private let searchField = SearchField()
+    /// 自定义字段编辑器必须由调用方持有（windowWillReturnFieldEditor 的约定）
+    private let searchFieldEditor = SearchFieldEditor.make()
     private let tabs = SegmentedPill(titles: [L("历史", "History"), L("收藏", "Favorites")])
     private let groupChipsBar = GroupChipsBar()
     private let tableView = NSTableView()
@@ -83,6 +85,7 @@ final class PanelController: NSObject {
         self.monitor = monitor
         panel = ClipPanel(contentRect: NSRect(origin: .zero, size: Self.panelSize))
         super.init()
+        panel.delegate = self
         buildUI()
 
         NotificationCenter.default.addObserver(
@@ -144,6 +147,7 @@ final class PanelController: NSObject {
         effectView.maskImage = PanelTheme.roundedMask(radius: PanelTheme.panelRadius)
         effectView.wantsLayer = true
 
+        searchField.usesSingleLineMode = true
         searchField.isBordered = false
         searchField.isBezeled = false
         searchField.drawsBackground = false
@@ -153,6 +157,9 @@ final class PanelController: NSObject {
         searchField.delegate = self
         searchField.translatesAutoresizingMaskIntoConstraints = false
         applyPlaceholder(searchPlaceholder(for: .history))
+        // 右键菜单期间面板会短暂失去 key，同分组胶囊菜单一样挂起自动隐藏
+        searchFieldEditor.onMenuWillOpen = { [weak self] in self?.suppressAutoHide = true }
+        searchFieldEditor.onMenuDidClose = { [weak self] in self?.endMenuSuppression() }
 
         tabs.onChange = { [weak self] index in
             self?.switchTab(to: Tab(rawValue: index) ?? .history)
@@ -236,7 +243,8 @@ final class PanelController: NSObject {
 
             searchField.leadingAnchor.constraint(equalTo: effectView.leadingAnchor, constant: 22),
             searchField.centerYAnchor.constraint(equalTo: effectView.topAnchor, constant: 31),
-            searchField.trailingAnchor.constraint(lessThanOrEqualTo: tabs.leadingAnchor, constant: -14),
+            searchField.trailingAnchor.constraint(equalTo: tabs.leadingAnchor, constant: -14),
+            searchField.heightAnchor.constraint(equalToConstant: 28),
 
             tabs.trailingAnchor.constraint(equalTo: effectView.trailingAnchor, constant: -22),
             tabs.centerYAnchor.constraint(equalTo: searchField.centerYAnchor),
@@ -405,6 +413,8 @@ final class PanelController: NSObject {
         groupChipsBar.resetInteractionState()
         switchTab(to: tab)
         searchField.stringValue = ""
+        // 上次打开时的输入撤销记录对着的是旧文字，留着 ⌘Z 会作用到已清空的搜索框上
+        panel.undoManager?.removeAllActions()
         reload()
         ClipRowCellView.resetHoverTracking()
 
@@ -686,43 +696,82 @@ final class PanelController: NSObject {
         }
     }
 
+    /// 搜索框正在用输入法组字（拼音/假名等未上屏）
+    private var isSearchComposing: Bool {
+        (searchField.currentEditor() as? NSTextView)?.hasMarkedText() == true
+    }
+
+    /// 局部监听器先于输入框拿到按键，这里的原则是：搜索框里有字可编辑时，
+    /// 编辑类按键（←/→、⌘⌫、带 ⇧/⌥/⌘ 的方向键）归搜索框；只有不会和编辑冲突的键才归列表。
     private func handleKeyDown(_ event: NSEvent) -> Bool {
         // 内联编辑别名/分组名时，按键交给输入框（Enter/Esc 由其自行处理）
         if isInlineEditing { return false }
-        let flags = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
+        // 输入法组字中：↑/↓ 选候选、Return 上屏、Esc 取消、←/→ 移动，全部交给输入法。
+        // 不放行的话回车会直接复制列表选中项并关闭面板，拼音还没上屏。
+        if isSearchComposing { return false }
+
+        // 不用 deviceIndependentFlagsMask：它含 capsLock / function，方向键自带 function 位，
+        // 开着大写锁定时 ⌘⌫ / ⌘D 也会对不上
+        let flags = event.modifierFlags.intersection([.command, .shift, .control, .option])
+        let queryEmpty = searchField.stringValue.isEmpty
 
         switch event.keyCode {
-        case 53:  // Esc
-            hide(animated: true)
+        case 53 where flags.isEmpty:  // Esc：有搜索词先清空，再按一次才关闭
+            if queryEmpty {
+                hide(animated: true)
+            } else {
+                // 走字段编辑器删除：记入撤销（⌘Z 能找回搜索词），并照常触发 controlTextDidChange 刷新。
+                // 直接赋 stringValue 会让编辑器里的撤销记录指向已不存在的文字范围。
+                focusSearchField()
+                if let editor = searchField.currentEditor() {
+                    editor.selectAll(nil)
+                    editor.delete(nil)
+                }
+            }
             return true
-        case 48:  // Tab：历史/收藏切换
+        case 48 where !flags.contains(.command) && !flags.contains(.control):  // Tab：历史/收藏切换
             switchTab(to: currentTab == .history ? .favorites : .history)
             reload()
             return true
-        case 126:  // ↑
+        case 126 where flags.isEmpty:  // ↑（⇧↑ 等留给输入框扩选）
             moveSelection(by: -1)
             return true
-        case 125:  // ↓
+        case 125 where flags.isEmpty:  // ↓
             moveSelection(by: 1)
             return true
-        case 124:  // →：收藏页切到下一个分组；历史页收藏选中项
+        case 124 where flags.isEmpty && queryEmpty:  // →：收藏页切到下一个分组；历史页收藏选中项
             if currentTab == .favorites { cycleGroup(by: 1) } else { setFavoriteSelected(true) }
             return true
-        case 123:  // ←：收藏页切到上一个分组；历史页取消收藏选中项
+        case 123 where flags.isEmpty && queryEmpty:  // ←：收藏页切到上一个分组；历史页取消收藏选中项
             if currentTab == .favorites { cycleGroup(by: -1) } else { setFavoriteSelected(false) }
             return true
         case 36, 76:  // Return / Enter
             copySelectedAndClose()
             return true
-        case 51 where flags == .command:  // Cmd+Backspace：删除
+        // ⌘⌫：搜索框有字时是「删到行首」（清空搜索词的肌肉记忆），不能顺手删掉一条历史
+        case 51 where flags == .command && queryEmpty:
             deleteSelected()
             return true
         case 2 where flags == .command:  // Cmd+D：收藏/取消收藏
             toggleFavoriteSelected()
             return true
         default:
+            redirectTypingToSearchIfNeeded(event, flags: flags)
             return false
         }
+    }
+
+    /// 焦点不在搜索框（点过列表空白处等）时直接打字：先把焦点交回搜索框，
+    /// 本次按键随后照常分发，落进搜索框（含输入法）。
+    private func redirectTypingToSearchIfNeeded(_ event: NSEvent, flags: NSEvent.ModifierFlags) {
+        let editing = searchField.currentEditor().map { panel.firstResponder === $0 } ?? false
+        guard !editing,
+              flags.subtracting(.shift).isEmpty,
+              let scalar = event.characters?.unicodeScalars.first,
+              !CharacterSet.controlCharacters.contains(scalar),
+              !(0xF700...0xF8FF).contains(scalar.value)   // 功能键（F1、Home、方向键等）私有区
+        else { return }
+        focusSearchField()
     }
 
     private func moveSelection(by delta: Int) {
@@ -807,8 +856,17 @@ final class PanelController: NSObject {
     private func restoreSearchFocus() {
         DispatchQueue.main.async { [weak self] in
             guard let self, panel.isVisible else { return }
-            panel.makeFirstResponder(searchField)
+            focusSearchField()
         }
+    }
+
+    /// 聚焦搜索框并把光标放到末尾。makeFirstResponder 默认全选已有文字，
+    /// 接着打的第一个字会把整条搜索词替换掉。
+    private func focusSearchField() {
+        if let editor = searchField.currentEditor(), panel.firstResponder === editor { return }   // 已在编辑，别重启编辑会话
+        guard panel.makeFirstResponder(searchField),
+              let editor = searchField.currentEditor() else { return }
+        editor.selectedRange = NSRange(location: (editor.string as NSString).length, length: 0)
     }
 
     private func showMoveToGroupMenu(for item: ClipItem) {
@@ -890,7 +948,21 @@ final class PanelController: NSObject {
 
 extension PanelController: NSTextFieldDelegate {
     func controlTextDidChange(_ obj: Notification) {
+        // 输入法组字中（如拼音 "zhong" 还没上屏）不查：中间态字母只会让列表乱闪。
+        // 上屏 / 取消组字时会再来一次文本变化，届时按最终文字查询。
+        guard !isSearchComposing else { return }
         reload(debounced: true)
+    }
+}
+
+// MARK: - 搜索框字段编辑器
+
+extension PanelController: NSWindowDelegate {
+    /// 只有搜索框换用可在未激活应用里拖选的编辑器；别的输入框返回 nil，沿用窗口默认编辑器。
+    func windowWillReturnFieldEditor(_ sender: NSWindow, to client: Any?) -> Any? {
+        let isSearch = client is SearchField
+            || (client as? NSTextFieldCell)?.controlView is SearchField
+        return isSearch ? searchFieldEditor : nil
     }
 }
 

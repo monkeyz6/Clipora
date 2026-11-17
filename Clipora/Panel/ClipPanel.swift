@@ -25,6 +25,28 @@ final class ClipPanel: NSPanel {
 
     override var canBecomeKey: Bool { true }
     override var canBecomeMain: Bool { false }
+
+    /// 应用是 .accessory 且没有主菜单，⌘X/C/V/A/Z 找不到 Edit 菜单项来分发，
+    /// 所有输入框（搜索 / 别名 / 分组名）都复制粘贴不了。这里在窗口层兜底，
+    /// 只在有输入框正在编辑时生效，动作沿响应链发给当前字段编辑器。
+    override func performKeyEquivalent(with event: NSEvent) -> Bool {
+        if super.performKeyEquivalent(with: event) { return true }
+        guard firstResponder is NSText,
+              let key = event.charactersIgnoringModifiers?.lowercased() else { return false }
+        // 不用 deviceIndependentFlagsMask：它含 capsLock / function，开着大写锁定会对不上
+        let flags = event.modifierFlags.intersection([.command, .shift, .control, .option])
+        let action: Selector
+        switch (flags, key) {
+        case (.command, "x"): action = #selector(NSText.cut(_:))
+        case (.command, "c"): action = #selector(NSText.copy(_:))
+        case (.command, "v"): action = #selector(NSText.paste(_:))
+        case (.command, "a"): action = #selector(NSText.selectAll(_:))
+        case (.command, "z"): action = Selector(("undo:"))
+        case ([.command, .shift], "z"): action = Selector(("redo:"))
+        default: return false
+        }
+        return NSApp.sendAction(action, to: nil, from: self)
+    }
 }
 
 // MARK: - 顶部拖拽区：在空白处按下即拖动整个面板
@@ -39,6 +61,119 @@ final class HeaderDragView: NSView {
         onDragEnded?()
     }
     override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
+}
+
+// MARK: - 搜索框
+
+/// 不激活面板里的搜索框。选区画在字段编辑器上，不在这个视图上。
+final class SearchField: NSTextField {
+    /// 文字（含编辑态）在固定 28pt 高的框里垂直居中，不顶到上沿
+    override class var cellClass: AnyClass? {
+        get { SearchFieldCell.self }
+        set {}
+    }
+
+    /// 应用未激活时的第一次按下也要交给本框（字段编辑器尚未盖上来时）
+    override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
+}
+
+/// 单行文字垂直居中；绘制、编辑、选中三处用同一个矩形，切换编辑态时文字不跳。
+final class SearchFieldCell: NSTextFieldCell {
+    private func centered(_ rect: NSRect) -> NSRect {
+        var r = rect
+        let textHeight = cellSize(forBounds: r).height
+        if textHeight < r.height {
+            r.origin.y += ((r.height - textHeight) / 2).rounded(.down)
+            r.size.height = textHeight
+        }
+        return r
+    }
+    override func titleRect(forBounds rect: NSRect) -> NSRect { super.titleRect(forBounds: centered(rect)) }
+    override func drawInterior(withFrame cellFrame: NSRect, in controlView: NSView) {
+        super.drawInterior(withFrame: centered(cellFrame), in: controlView)
+    }
+    override func edit(withFrame rect: NSRect, in controlView: NSView, editor: NSText, delegate: Any?, event: NSEvent?) {
+        super.edit(withFrame: centered(rect), in: controlView, editor: editor, delegate: delegate, event: event)
+    }
+    override func select(withFrame rect: NSRect, in controlView: NSView, editor: NSText, delegate: Any?, start selStart: Int, length selLength: Int) {
+        super.select(withFrame: centered(rect), in: controlView, editor: editor, delegate: delegate, start: selStart, length: selLength)
+    }
+}
+
+/// 搜索框专用字段编辑器。窗口默认的 NSTextView 不收未激活应用的按下，拖选和右键到不了。
+/// 只替换搜索框；别名 / 分组名继续用窗口自带的编辑器。调用方必须自己持有，窗口不保留它。
+final class SearchFieldEditor: NSTextView {
+    static func make() -> SearchFieldEditor {
+        let editor = SearchFieldEditor()
+        editor.isFieldEditor = true
+        editor.isEditable = true
+        editor.isSelectable = true
+        editor.isRichText = false
+        editor.drawsBackground = false
+        editor.allowsUndo = true
+        editor.usesFontPanel = false
+        editor.usesRuler = false
+        // 新建 NSTextView 默认会做智能引号/拼写替换；窗口自带字段编辑器是关的。
+        // 搜索词要按原样匹配，不能把用户输入改成弯引号。
+        editor.isAutomaticQuoteSubstitutionEnabled = false
+        editor.isAutomaticDashSubstitutionEnabled = false
+        editor.isAutomaticDataDetectionEnabled = false
+        editor.isAutomaticLinkDetectionEnabled = false
+        editor.isAutomaticTextReplacementEnabled = false
+        editor.isAutomaticSpellingCorrectionEnabled = false
+        editor.isContinuousSpellCheckingEnabled = false
+        editor.isGrammarCheckingEnabled = false
+        editor.smartInsertDeleteEnabled = false
+        return editor
+    }
+
+    override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
+
+    // ⌘X/C/V/A/Z 由 ClipPanel.performKeyEquivalent 统一兜底，这里不再重复处理。
+
+    /// 右键菜单弹出/关闭。非激活面板弹菜单会短暂失去 key，调用方要借此挂起自动隐藏，
+    /// 否则右键一点面板就关了，菜单里的复制/粘贴永远点不到。
+    var onMenuWillOpen: (() -> Void)?
+    var onMenuDidClose: (() -> Void)?
+
+    /// 只留编辑相关的几项；系统默认菜单带字体/拼写/语音/服务等，对搜索框没有意义
+    override func menu(for event: NSEvent) -> NSMenu? {
+        let menu = NSMenu()
+        let entries: [(String, Selector, String)] = [
+            (L("剪切", "Cut"), #selector(NSText.cut(_:)), "x"),
+            (L("拷贝", "Copy"), #selector(NSText.copy(_:)), "c"),
+            (L("粘贴", "Paste"), #selector(NSText.paste(_:)), "v"),
+        ]
+        for (title, action, key) in entries {
+            menu.addItem(withTitle: title, action: action, keyEquivalent: key)
+        }
+        menu.addItem(.separator())
+        menu.addItem(withTitle: L("全选", "Select All"), action: #selector(NSText.selectAll(_:)), keyEquivalent: "a")
+        return menu
+    }
+
+    override func willOpenMenu(_ menu: NSMenu, with event: NSEvent) {
+        super.willOpenMenu(menu, with: event)
+        onMenuWillOpen?()
+    }
+
+    override func didCloseMenu(_ menu: NSMenu, with event: NSEvent?) {
+        super.didCloseMenu(menu, with: event)
+        onMenuDidClose?()
+    }
+
+    /// ⌘V 和右键粘贴都走这里。多行剪贴板压成一行（单行框里换行看不见、也搜不中），
+    /// 首尾空白去掉：从别处复制一整行常带结尾换行，压平后会变成搜不中的尾空格。
+    override func paste(_ sender: Any?) {
+        guard let raw = NSPasteboard.general.string(forType: .string) else { return }
+        let flat = raw
+            .replacingOccurrences(of: "\r\n", with: "\n")   // 否则 CRLF 会压出两个空格
+            .components(separatedBy: .newlines)
+            .joined(separator: " ")
+            .trimmingCharacters(in: .whitespaces)
+        guard !flat.isEmpty else { return }
+        insertText(flat, replacementRange: selectedRange())
+    }
 }
 
 // MARK: - 胶囊 Toast（浅色毛玻璃：圆形彩色徽章 + 文案，横向）
