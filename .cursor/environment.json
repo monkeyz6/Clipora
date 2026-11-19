@@ -1,0 +1,5 @@
+{
+  "name": "Clipora",
+  "user": "ubuntu",
+  "install": "bash scripts/cloud-agent-setup.sh"
+}
